@@ -1,0 +1,77 @@
+# Fazer tupla com sinonimos de rua
+street_synonyms = (
+    "rua",
+    "avenida",
+    "alameda",
+    "travessa",
+    "praça",
+    "largo",
+    "viela",
+    "estrada",
+    "boulevard",
+    "passagem",
+    "via",
+    "rodovia"
+)
+
+# Fazer tupla com nomes de cidades brasileiras
+city_names = (
+    "curitiba",
+)
+
+# Fazer tupla com o nome de bairros
+neighborhood_names = (
+    "xaxim",
+    "prado velho",
+    "batel",
+    "centro",
+    "cabral",
+    "alto da xv",
+    "barreirinha",
+    "boqueirão",
+    "cajuru",
+    "campo comprido",
+    "cic",
+    "lindoia",
+    "merces",
+    "portao",
+    "santa felicidade",
+    "santo inacio",
+    "sao braz",
+    "tingui",
+    "pinheirinho",
+    "agua verde",
+    "ahu",
+    "bigorrilho",
+    "hauer",
+    "jardim social",
+    "novos",
+    "orleans",
+    "vila izabel",
+    "vista alegre",
+    "sao francisco",
+    "atuba",
+    "campina do siqueira",
+    "santa quiteria",
+    "bom retiro",
+    "cachoeira",
+    "taruma",
+    "fanny",
+    "tatuquara",
+    "taboao",
+    "butiatuvinha",
+    "guabirotuba",
+    "hugo lange",
+    "ahu",
+    "são lourenço",
+    "mossunguê",
+    "pilarzinho",
+    "são joão",
+    "capão da imbuia",
+    "sítio cercado",
+    "umbará",
+    "vila fanny",
+    "vila hauer",
+    "vila isabel"
+)
+

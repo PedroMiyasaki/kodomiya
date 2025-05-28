@@ -1,0 +1,13 @@
+dlt
+pandas
+numpy
+scikit-learn
+duckdb
+beautifulsoup4
+geopy
+openpyxl
+requests
+pyyaml
+scipy
+matplotlib
+ipykernel 
