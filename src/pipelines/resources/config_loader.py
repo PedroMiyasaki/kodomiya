@@ -75,6 +75,14 @@ class ConfigLoader:
         
         return self._config['scraper_settings']
     
+    def get_telegram_config(self) -> Dict[str, Any]:
+        """Get Telegram configuration."""
+        if not self._config or 'telegram' not in self._config:
+            # Return an empty dict instead of raising an error, 
+            # so the calling script can handle missing config gracefully (e.g. skip notifications)
+            return {}
+        return self._config['telegram']
+    
     def get_config_value(self, *keys: str, default: Optional[Any] = None) -> Any:
         """
         Get a specific configuration value using a chain of keys.

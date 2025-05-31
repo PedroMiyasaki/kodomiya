@@ -24,3 +24,25 @@ class ImovelRegister(Register):
 # Contruir classe schema de imovel History
 class PriceRegister(Register):
     preco: Optional[float]
+
+# Auction property schemas
+class LeilaoImovelRegister(Register):
+    preco_primeira_praca: Optional[float]
+    data_primeira_praca: Optional[datetime]
+    preco_segunda_praca: Optional[float]
+    data_segunda_praca: Optional[datetime]
+    preco_atual: float
+    tamanho: float
+    rua: str
+    bairro: str
+    cidade: str
+    latitude: Optional[float]
+    longitude: Optional[float]
+    link_detalhes: str
+
+class LeilaoImovelHistory(Register):
+    preco_primeira_praca: Optional[float]
+    data_primeira_praca: Optional[datetime]
+    preco_segunda_praca: Optional[float]
+    data_segunda_praca: Optional[datetime]
+    preco_atual: float

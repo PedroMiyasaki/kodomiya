@@ -1,20 +1,17 @@
 # Imports DLT
 import dlt
-from dlt.sources.helpers import requests
-
-# Imports online
-from geopy.geocoders import Nominatim
-from geopy.point import Point
+import sys
+import os
+import logging
 from datetime import datetime
 from typing import Iterable
 from requests.exceptions import HTTPError
 from bs4 import BeautifulSoup
-import logging
-import sys
-import os
+from geopy.geocoders import Nominatim
+from geopy.point import Point
 import cloudscraper
 
-# Adjust Python path to recognize 'src' module when script is run directly
+# Add project root to sys.path for import resolution
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
@@ -25,7 +22,7 @@ from src.pipelines.resources.trading_properties_function_classes import vivaReal
 from src.pipelines.resources.common.common_functions import make_propertie_id
 from src.pipelines.resources.config_loader import config
 
-# Load configuration for viva_real
+# Load configurations
 VIVA_REAL_CONFIG = config.get_source_config('viva_real')
 GEOCODING_CONFIG = config.get_geocoding_config()
 DATABASE_CONFIG = config.get_database_config()
@@ -74,7 +71,7 @@ def generate_viva_real_register(
         Point(VIVA_REAL_CONFIG['search_lat_long_view_box'][1][0], VIVA_REAL_CONFIG['search_lat_long_view_box'][1][1])
     ]
 ) -> Iterable[dict]:
-    # Criar geo-localizador pré laço de repetição
+    """Generate property registration data from Viva Real."""
     logger.info("Starting Viva Real property register scraping")
     logger.info(f"Using base URL: {base_url}")
     geolocator = Nominatim(user_agent=GEOCODING_CONFIG['user_agent'])
@@ -129,54 +126,54 @@ def generate_viva_real_register(
                 logger.debug(f"Processing property card {i+1}/{len(cards_imoveis)} on page {page_number}")
                 
                 # Pegar campo de preço do imovel
-                preco = vivaReal.return_viva_real_preco(
+                price = vivaReal.return_viva_real_preco(
                     card_imovel,
                     VIVA_REAL_CONFIG['price']
                 )
-                logger.debug(f"Extracted price: {preco}")
+                logger.debug(f"Extracted price: {price}")
 
                 # Pegar campo de tamanho do imóvel
-                tamanho = vivaReal.return_viva_real_tamanho(
+                size = vivaReal.return_viva_real_tamanho(
                     card_imovel,
                     VIVA_REAL_CONFIG['size']
                 )
-                logger.debug(f"Extracted size: {tamanho}")
+                logger.debug(f"Extracted size: {size}")
 
                 # Pegar campo do numero de quartos do imovel
-                n_quartos = vivaReal.return_viva_real_n_quartos(
+                bedrooms = vivaReal.return_viva_real_n_quartos(
                     card_imovel,
                     VIVA_REAL_CONFIG['rooms']
                 )
-                logger.debug(f"Extracted rooms: {n_quartos}")
+                logger.debug(f"Extracted rooms: {bedrooms}")
 
                 # Pegar campo do numero de banheiros do imovel
-                n_banheiros = vivaReal.return_viva_real_n_banheiros(
+                bathrooms = vivaReal.return_viva_real_n_banheiros(
                     card_imovel,
                     VIVA_REAL_CONFIG['bathrooms']
                 )
-                logger.debug(f"Extracted bathrooms: {n_banheiros}")
+                logger.debug(f"Extracted bathrooms: {bathrooms}")
 
                 # Pegar campo do numero de garagens do imovel
-                n_garagem = vivaReal.return_viva_real_n_vagas_garagem(
+                parking = vivaReal.return_viva_real_n_vagas_garagem(
                     card_imovel,
                     VIVA_REAL_CONFIG['parking']
                 )
-                logger.debug(f"Extracted parking spaces: {n_garagem}")
+                logger.debug(f"Extracted parking spaces: {parking}")
 
                 # Pegar o campo de rua, bairro, e cidade
-                rua, bairro, cidade = vivaReal.return_viva_real_endereco(
+                street, neighborhood, city = vivaReal.return_viva_real_endereco(
                     card_imovel,
                     VIVA_REAL_CONFIG['address']
                 )
-                logger.debug(f"Extracted address: {rua}, {bairro}, {cidade}")
+                logger.debug(f"Extracted address: {street}, {neighborhood}, {city}")
 
                 # Captar a lag & long do imóvel
-                endereco = str(rua).strip().title() + " - " + str(cidade).strip().title() + " - PR"
-                logger.debug(f"Geocoding address: {endereco}")
+                address = f"{str(street).strip().title()} - {str(city).strip().title()} - PR"
+                logger.debug(f"Geocoding address: {address}")
                 
                 try:
                     geolocator_info = geolocator.geocode(
-                        endereco, 
+                        address, 
                         viewbox=search_lat_long_view_box, 
                         country_codes=GEOCODING_CONFIG['country_codes'], 
                         timeout=GEOCODING_CONFIG['timeout'], 
@@ -186,30 +183,30 @@ def generate_viva_real_register(
                     longitude = getattr(geolocator_info, "longitude", None)
                     logger.debug(f"Geocoding result: lat={latitude}, long={longitude}")
                 except Exception as e:
-                    logger.error(f"Error geocoding address '{endereco}': {str(e)}")
+                    logger.error(f"Error geocoding address '{address}': {str(e)}")
                     latitude = None
                     longitude = None
 
                 # Gerar id com hash md5 (usar uma junção de rua bairro e cidade)
-                propertie_id = make_propertie_id(list_of_string_to_concatenate=[rua, bairro, cidade])
-                logger.debug(f"Generated property ID: {propertie_id}")
+                property_id = make_propertie_id(list_of_string_to_concatenate=[street, neighborhood, city])
+                logger.debug(f"Generated property ID: {property_id}")
 
-                current_page_ids.add(propertie_id)
-                if propertie_id in previous_page_ids:
+                current_page_ids.add(property_id)
+                if property_id in previous_page_ids:
                     duplicates_found += 1
 
                 # Retornar o dicionários com os dados do imóvel
                 property_data = {
-                    "id": propertie_id,
+                    "id": property_id,
                     "datahora": datetime.strptime(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "%Y-%m-%d %H:%M:%S"),
-                    "preco": preco,
-                    "tamanho": tamanho,
-                    "n_quartos": n_quartos,
-                    "n_banheiros": n_banheiros,
-                    "n_garagem": n_garagem,
-                    "rua": rua,
-                    "bairro": bairro,
-                    "cidade": cidade,
+                    "preco": price,
+                    "tamanho": size,
+                    "n_quartos": bedrooms,
+                    "n_banheiros": bathrooms,
+                    "n_garagem": parking,
+                    "rua": street,
+                    "bairro": neighborhood,
+                    "cidade": city,
                     "latitude": latitude,
                     "longitude": longitude,
                 }
@@ -248,6 +245,7 @@ def generate_viva_real_history(
     propertie_html_element: str = VIVA_REAL_CONFIG['property_card']['html_element'],
     page_number: int = 1
 ) -> Iterable[dict]:
+    """Generate price history data from Viva Real."""
     logger.info("Starting Viva Real price history scraping")
     scraper = cloudscraper.create_scraper()
     history_count = 0
@@ -296,32 +294,32 @@ def generate_viva_real_history(
                 logger.debug(f"Processing price history for property {i+1}/{len(cards_imoveis)} on page {page_number}")
                 
                 # Pegar campo de preço do imovel
-                preco = vivaReal.return_viva_real_preco(
+                price = vivaReal.return_viva_real_preco(
                     card_imovel,
                     VIVA_REAL_CONFIG['price']
                 )
-                logger.debug(f"Extracted price: {preco}")
+                logger.debug(f"Extracted price: {price}")
 
                 # Pegar o campo de rua, bairro, e cidade
-                rua, bairro, cidade = vivaReal.return_viva_real_endereco(
+                street, neighborhood, city = vivaReal.return_viva_real_endereco(
                     card_imovel,
                     VIVA_REAL_CONFIG['address']
                 )
-                logger.debug(f"Extracted address: {rua}, {bairro}, {cidade}")
+                logger.debug(f"Extracted address: {street}, {neighborhood}, {city}")
 
                 # Gerar id com hash md5 (usar uma junção de rua bairro e cidade)
-                propertie_id = make_propertie_id(list_of_string_to_concatenate=[rua, bairro, cidade])
-                logger.debug(f"Generated property ID: {propertie_id}")
+                property_id = make_propertie_id(list_of_string_to_concatenate=[street, neighborhood, city])
+                logger.debug(f"Generated property ID: {property_id}")
 
-                current_page_ids.add(propertie_id)
-                if propertie_id in previous_page_ids:
+                current_page_ids.add(property_id)
+                if property_id in previous_page_ids:
                     duplicates_found += 1
 
                 # Retornar o dicionários com os dados do imóvel
                 history_data = {
-                    "id": propertie_id,
+                    "id": property_id,
                     "datahora": datetime.strptime(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "%Y-%m-%d %H:%M:%S"),
-                    "preco": preco,
+                    "preco": price,
                 }
                 
                 history_count += 1
@@ -353,6 +351,7 @@ def generate_viva_real_history(
 # Fazer função juntando os recursos do viva real
 @dlt.source
 def generate_viva_real():
+    """Generate Viva Real data source."""
     logger.info("Registering Viva Real resources")
     # yield resources
     yield generate_viva_real_register
@@ -373,11 +372,14 @@ pipeline = dlt.pipeline(
 
 # Executar pipeline com o source
 logger.info("Running Viva Real pipeline")
+
+# Executar pipeline
 try:
     pipeline_result = pipeline.run(generate_viva_real())
     logger.info(f"Pipeline completed successfully: {pipeline_result}")
 
 except Exception as e:
     logger.error(f"Pipeline execution failed: {str(e)}", exc_info=True)
+    dlt_pipeline_load_info = {"error": str(e), "message": "Pipeline execution failed before completion."}
 
 logger.info("Viva Real pipeline execution finished")

@@ -394,11 +394,14 @@ pipeline = dlt.pipeline(
 
 # Executar pipeline com o source
 logger.info("Running Chaves na Mão pipeline")
+
+# Executar pipeline
 try:
     pipeline_result = pipeline.run(generate_chaves_na_mao())
     logger.info(f"Pipeline completed successfully: {pipeline_result}")
 
 except Exception as e:
     logger.error(f"Pipeline execution failed: {str(e)}", exc_info=True)
+    dlt_pipeline_load_info = {"error": str(e), "message": "Pipeline execution failed before completion."}
 
 logger.info("Chaves na Mão pipeline execution finished")
