@@ -10,7 +10,7 @@ from geopy.geocoders import Nominatim
 from geopy.point import Point
 import cloudscraper
 
-
+# Add project root to sys.path for import resolution
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
@@ -20,13 +20,14 @@ from src.pipelines.resources.trading_properties_function_classes import zapImove
 from src.pipelines.resources.common.common_functions import make_propertie_id
 from src.pipelines.resources.config_loader import config
 
-
+# Load configurations
 ZAP_CONFIG = config.get_source_config('zap_imoveis')
 GEOCODING_CONFIG = config.get_geocoding_config()
 DATABASE_CONFIG = config.get_database_config()
 LOGGING_CONFIG = config.get_logging_config()
 SCRAPER_SETTINGS = config.get_scraper_settings()
 
+# Get max pages from environment variable if set
 MAX_PAGES = int(os.environ.get('KODOMIYA_MAX_PAGES', 0)) or None
 
 
@@ -42,7 +43,6 @@ def setup_logging():
     handler.setFormatter(formatter)
     
     logger.addHandler(handler)
-    
     return logger
 
 
@@ -112,48 +112,48 @@ def generate_zap_imoveis_register(
             for i, card_imovel in enumerate(cards_imoveis):
                 logger.debug(f"Processing property card {i+1}/{len(cards_imoveis)} on page {page_number}")
                 
-                preco = zapImoveis.return_zap_imoveis_preco(
+                price = zapImoveis.return_zap_imoveis_preco(
                     card_imovel, 
                     ZAP_CONFIG['price']
                 )
-                logger.debug(f"Extracted price: {preco}")
+                logger.debug(f"Extracted price: {price}")
 
-                tamanho = zapImoveis.return_zap_imoveis_tamanho(
+                size = zapImoveis.return_zap_imoveis_tamanho(
                     card_imovel,
                     ZAP_CONFIG['size']
                 )
-                logger.debug(f"Extracted size: {tamanho}")
+                logger.debug(f"Extracted size: {size}")
 
-                n_quartos = zapImoveis.return_zap_imoveis_n_quartos(
+                bedrooms = zapImoveis.return_zap_imoveis_n_quartos(
                     card_imovel,
                     ZAP_CONFIG['rooms']
                 )
-                logger.debug(f"Extracted rooms: {n_quartos}")
+                logger.debug(f"Extracted rooms: {bedrooms}")
 
-                n_banheiros = zapImoveis.return_zap_imoveis_n_banheiros(
+                bathrooms = zapImoveis.return_zap_imoveis_n_banheiros(
                     card_imovel,
                     ZAP_CONFIG['bathrooms']
                 )
-                logger.debug(f"Extracted bathrooms: {n_banheiros}")
+                logger.debug(f"Extracted bathrooms: {bathrooms}")
 
-                n_garagem = zapImoveis.return_zap_imoveis_n_vagas_garagem(
+                parking = zapImoveis.return_zap_imoveis_n_vagas_garagem(
                     card_imovel,
                     ZAP_CONFIG['parking']
                 )
-                logger.debug(f"Extracted parking spaces: {n_garagem}")
+                logger.debug(f"Extracted parking spaces: {parking}")
 
-                rua, bairro, cidade = zapImoveis.return_zap_imoveis_endereco(
+                street, neighborhood, city = zapImoveis.return_zap_imoveis_endereco(
                     card_imovel,
                     ZAP_CONFIG['address']
                 )
-                logger.debug(f"Extracted address: {rua}, {bairro}, {cidade}")
+                logger.debug(f"Extracted address: {street}, {neighborhood}, {city}")
 
-                endereco = str(rua).strip().title() + " - " + str(cidade).strip().title() + " - PR"
-                logger.debug(f"Geocoding address: {endereco}")
+                address = f"{str(street).strip().title()} - {str(city).strip().title()} - PR"
+                logger.debug(f"Geocoding address: {address}")
                 
                 try:
                     geolocator_info = geolocator.geocode(
-                        endereco, 
+                        address, 
                         viewbox=search_lat_long_view_box, 
                         country_codes=GEOCODING_CONFIG['country_codes'], 
                         timeout=GEOCODING_CONFIG['timeout'], 
@@ -164,28 +164,28 @@ def generate_zap_imoveis_register(
                     logger.debug(f"Geocoding result: lat={latitude}, long={longitude}")
                 
                 except Exception as e:
-                    logger.error(f"Error geocoding address '{endereco}': {str(e)}")
+                    logger.error(f"Error geocoding address '{address}': {str(e)}")
                     latitude = None
                     longitude = None
 
-                propertie_id = make_propertie_id(list_of_string_to_concatenate=[rua, bairro, cidade])
-                logger.debug(f"Generated property ID: {propertie_id}")
+                property_id = make_propertie_id(list_of_string_to_concatenate=[street, neighborhood, city])
+                logger.debug(f"Generated property ID: {property_id}")
 
-                current_page_ids.add(propertie_id)
-                if propertie_id in previous_page_ids:
+                current_page_ids.add(property_id)
+                if property_id in previous_page_ids:
                     duplicates_found += 1
 
                 property_data = {
-                    "id": propertie_id,
+                    "id": property_id,
                     "datahora": datetime.strptime(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "%Y-%m-%d %H:%M:%S"),
-                    "preco": preco,
-                    "tamanho": tamanho,
-                    "n_quartos": n_quartos,
-                    "n_banheiros": n_banheiros,
-                    "n_garagem": n_garagem,
-                    "rua": rua,
-                    "bairro": bairro,
-                    "cidade": cidade,
+                    "preco": price,
+                    "tamanho": size,
+                    "n_quartos": bedrooms,
+                    "n_banheiros": bathrooms,
+                    "n_garagem": parking,
+                    "rua": street,
+                    "bairro": neighborhood,
+                    "cidade": city,
                     "latitude": latitude,
                     "longitude": longitude,
                 }
@@ -194,8 +194,11 @@ def generate_zap_imoveis_register(
                 logger.debug(f"Yielding property data: {property_data}")
                 yield property_data
 
-            if SCRAPER_SETTINGS.get('duplicate_page_threshold', 0) > 0 and duplicates_found >= SCRAPER_SETTINGS['duplicate_page_threshold'] and len(current_page_ids) > 0:
-                logger.warning(f"Stopping due to duplicate content. Found {duplicates_found} duplicates from previous page. Threshold is {SCRAPER_SETTINGS['duplicate_page_threshold']}.")
+            if (SCRAPER_SETTINGS.get('duplicate_page_threshold', 0) > 0 and 
+                    duplicates_found >= SCRAPER_SETTINGS['duplicate_page_threshold'] and 
+                    len(current_page_ids) > 0):
+                logger.warning(f"Stopping due to duplicate content. Found {duplicates_found} duplicates from previous page. "
+                             f"Threshold is {SCRAPER_SETTINGS['duplicate_page_threshold']}.")
                 break
 
             previous_page_ids = current_page_ids
@@ -257,37 +260,40 @@ def generate_zap_imoveis_history(
             for i, card_imovel in enumerate(cards_imoveis):
                 logger.debug(f"Processing price history for property {i+1}/{len(cards_imoveis)} on page {page_number}")
                 
-                preco = zapImoveis.return_zap_imoveis_preco(
+                price = zapImoveis.return_zap_imoveis_preco(
                     card_imovel,
                     ZAP_CONFIG['price']
                 )
-                logger.debug(f"Extracted price: {preco}")
+                logger.debug(f"Extracted price: {price}")
 
-                rua, bairro, cidade = zapImoveis.return_zap_imoveis_endereco(
+                street, neighborhood, city = zapImoveis.return_zap_imoveis_endereco(
                     card_imovel,
                     ZAP_CONFIG['address']
                 )
-                logger.debug(f"Extracted address: {rua}, {bairro}, {cidade}")
+                logger.debug(f"Extracted address: {street}, {neighborhood}, {city}")
 
-                propertie_id = make_propertie_id(list_of_string_to_concatenate=[rua, bairro, cidade])
-                logger.debug(f"Generated property ID: {propertie_id}")
+                property_id = make_propertie_id(list_of_string_to_concatenate=[street, neighborhood, city])
+                logger.debug(f"Generated property ID: {property_id}")
 
-                current_page_ids.add(propertie_id)
-                if propertie_id in previous_page_ids:
+                current_page_ids.add(property_id)
+                if property_id in previous_page_ids:
                     duplicates_found += 1
 
                 history_data = {
-                    "id": propertie_id,
+                    "id": property_id,
                     "datahora": datetime.strptime(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "%Y-%m-%d %H:%M:%S"),
-                    "preco": preco,
+                    "preco": price,
                 }
                 
                 history_count += 1
                 logger.debug(f"Yielding price history data: {history_data}")
                 yield history_data
 
-            if SCRAPER_SETTINGS.get('duplicate_page_threshold', 0) > 0 and duplicates_found >= SCRAPER_SETTINGS['duplicate_page_threshold'] and len(current_page_ids) > 0:
-                logger.warning(f"Stopping price history scraping due to duplicate content. Found {duplicates_found} duplicates from previous page. Threshold is {SCRAPER_SETTINGS['duplicate_page_threshold']}.")
+            if (SCRAPER_SETTINGS.get('duplicate_page_threshold', 0) > 0 and 
+                    duplicates_found >= SCRAPER_SETTINGS['duplicate_page_threshold'] and 
+                    len(current_page_ids) > 0):
+                logger.warning(f"Stopping price history scraping due to duplicate content. Found {duplicates_found} duplicates. "
+                             f"Threshold is {SCRAPER_SETTINGS['duplicate_page_threshold']}.")
                 break
 
             previous_page_ids = current_page_ids
@@ -325,6 +331,6 @@ try:
 
 except Exception as e:
     logger.error(f"Pipeline execution failed: {str(e)}", exc_info=True)
-    dlt_pipeline_load_info = {"error": str(e), "message": "Pipeline execution failed before completion."}
+    pipeline_result = {"error": str(e), "message": "Pipeline execution failed before completion."}
 
 logger.info("Zap Imóveis pipeline execution finished")

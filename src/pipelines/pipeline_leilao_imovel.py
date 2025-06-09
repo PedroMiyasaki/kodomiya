@@ -141,20 +141,30 @@ def generate_leilao_imovel_register(
                 )
                 logger.debug(f"Extracted address: {rua}, {bairro}, {cidade}")
                 
-                tamanho = None
+                # Initialize area fields as None, to be fetched later if link_detalhes is available
+                area_util = None
+                area_terreno = None
+                aceita_financiamento = None
+                aceita_fgts = None
+                n_garagem = None
+                n_quartos = None
+
                 if link_detalhes:
-                    logger.debug(f"Fetching size from details page: {link_detalhes}")
-                    tamanho = leilaoImovel.return_leilao_imovel_tamanho(
-                        link_detalhes,
-                        LEILAO_CONFIG['size'],
-                        scraper_instance # Pass the scraper instance (requests)
+                    # Fetch and parse the details page for tamanho and other info
+                    details_page_data = leilaoImovel.return_leilao_imovel_details_page_info(
+                        link_detalhes, 
+                        LEILAO_CONFIG['details_page_selectors'], # Updated to pass the new parent config key
+                        scraper_instance
                     )
-                    logger.debug(f"Extracted size: {tamanho}")
-                else:
-                    logger.warning("No details link found, cannot fetch size.")
+                    area_util = details_page_data.get("area_util")
+                    area_terreno = details_page_data.get("area_terreno")
+                    aceita_financiamento = details_page_data.get("aceita_financiamento")
+                    aceita_fgts = details_page_data.get("aceita_fgts")
+                    n_garagem = details_page_data.get("n_garagem")
+                    n_quartos = details_page_data.get("n_quartos")
 
                 latitude, longitude = None, None
-                if rua and cidade: # Geocode only if essential address parts are present
+                if rua and cidade: 
                     endereco_completo = f"{str(rua).strip().title()}, {str(bairro).strip().title()} - {str(cidade).strip().title()} - PR"
                     logger.debug(f"Geocoding address: {endereco_completo}")
                     try:
@@ -196,13 +206,18 @@ def generate_leilao_imovel_register(
                     "preco_segunda_praca": preco_segunda_praca,
                     "data_segunda_praca": data_segunda_praca,
                     "preco_atual": preco_atual,
-                    "tamanho": tamanho,
+                    "area_util": area_util,
+                    "area_terreno": area_terreno,
                     "rua": rua,
                     "bairro": bairro,
                     "cidade": cidade,
                     "latitude": latitude,
                     "longitude": longitude,
-                    "link_detalhes": link_detalhes
+                    "link_detalhes": link_detalhes,
+                    "aceita_financiamento": aceita_financiamento,
+                    "aceita_fgts": aceita_fgts,
+                    "n_garagem": n_garagem,
+                    "n_quartos": n_quartos
                 }
                 
                 properties_count += 1
@@ -339,18 +354,18 @@ def generate_leilao_imovel_source():
 logger.info("Creating Leilão Imóvel DLT pipeline")
 pipeline = dlt.pipeline(
     pipeline_name="kodomiya",
-    dataset_name="kodomiya_leilao_imovel", # Specific dataset name
+    dataset_name="kodomiya_leilao_imovel",
     destination=dlt.destinations.duckdb(f"{DATABASE_CONFIG['path']}/kodomiya.duckdb"),
 )
 
-# Main execution block
-if __name__ == "__main__":
-    logger.info("Running Leilão Imóvel pipeline")
-    try:
-        load_info = pipeline.run(generate_leilao_imovel_source())
-        logger.info(f"Pipeline completed successfully: {load_info}")
-        logger.info(str(load_info))
-    except Exception as e:
-        logger.error(f"Pipeline execution failed: {str(e)}", exc_info=True)
+logger.info("Running Leilão Imóvel pipeline")
 
-    logger.info("Leilão Imóvel pipeline execution finished") 
+try:
+    pipeline_result = pipeline.run(generate_leilao_imovel_source())
+    logger.info(f"Pipeline completed successfully: {pipeline_result}")
+
+except Exception as e:
+    logger.error(f"Pipeline execution failed: {str(e)}", exc_info=True)
+    pipeline_result = {"error": str(e), "message": "Pipeline execution failed before completion."}
+
+logger.info("Leilão Imóvel pipeline execution finished") 

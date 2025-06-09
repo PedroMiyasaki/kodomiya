@@ -1,3 +1,5 @@
+import logging
+
 # Imports offline
 from .common.common_functions import return_word_founded_in_sentence, return_only_alphanumeric_part
 from .common.common_objects import neighborhood_names, city_names
@@ -6,7 +8,8 @@ from typing import Optional
 import requests
 from bs4 import BeautifulSoup
 from requests import HTTPError
-import logging
+
+logger = logging.getLogger(__name__)
 
 # Fazer classe de funções da fonte chaves na mão
 class chavesNaMao():
@@ -529,107 +532,154 @@ class leilaoImovel():
     def return_leilao_imovel_endereco(propertie_card, address_config):
         rua, bairro, cidade = "", "", ""
         try:
-            address_container = propertie_card.find(class_=address_config['container_class'])
-            if address_container:
-                p_tag = address_container.find(address_config['text_container_tag'])
-                if p_tag:
-                    # The address details are usually within a <span> inside the <p>
-                    span_tag = p_tag.find('span')
-                    if span_tag:
-                        full_address_text = span_tag.text.strip()
-                        # Basic parsing strategy: 
-                        # Rua: part before ",N." or first comma if "N." not present
-                        # Bairro: part after ",N. " and before " - CEP:" or second comma part
-                        # Cidade: often implicit (Curitiba from search) or after Bairro before CEP
-                        # This will likely need refinement based on more examples.
-                        
-                        # Example: RUA EXPEDICIONARIO FRANCISCO PEREIRA DOS,N. 2210  UN 02, CASA B, ALTO BOQUEIRAO - CEP: 81850-280, CU...
-                        # Example: RUA DILSON LUIZ,N. 1238 APTO. 402 BL 08, UMBARA - CEP: 81940-217, CURITIBA - PARANA
-                        # Example: RUA ANGELO TOZIM, 200- APTO 304, BL 07 (Here, no Bairro/Cidade explicitly before CEP)
+            address_container = propertie_card.find(class_=address_config.get('container_class'))
+            if not address_container:
+                return "", "", ""
 
-                        parts = full_address_text.split('-')
-                        rua_bairro_part = parts[0].strip()
-                        
-                        # Try to get a more structured title for the property if available
-                        title_b_tag = p_tag.find('b')
-                        if title_b_tag and 'em Leilão em' in title_b_tag.text:
-                            try:
-                                cidade = title_b_tag.text.split('em Leilão em')[1].split('/')[0].strip()
-                            except IndexError:
-                                pass
-                        
-                        # Attempt to parse Rua more reliably
-                        if ',N.' in rua_bairro_part:
-                            rua = rua_bairro_part.split(',N.')[0].strip()
-                            bairro_candidate = rua_bairro_part.split(',N.')[1].split(',')[-1].strip() # last part after N.
-                        elif ',' in rua_bairro_part:
-                            rua_parts = rua_bairro_part.split(',')
-                            rua = rua_parts[0].strip()
-                            if len(rua_parts) > 1:
-                                bairro_candidate = rua_parts[-1].strip()
-                        else: # If no comma and no N.
-                            rua = rua_bairro_part # Assume the whole thing might be the street
-                            bairro_candidate = ""
+            p_tag = address_container.find(address_config.get('text_container_tag'))
+            if not p_tag:
+                return "", "", ""
 
-                        # More robust bairro and cidade extraction
-                        if bairro_candidate:
-                            bairro = return_word_founded_in_sentence(bairro_candidate, neighborhood_names)
-                        
-                        # If cidade wasn't found from title, try from address string
-                        if not cidade and len(parts) > 1 and "CEP:" in parts[-1]:
-                            # Example: ALTO BOQUEIRAO - CEP: 81850-280, CURITIBA - PARANA
-                            # Look for city in the part after CEP or the last general part
-                            cep_part_index = -1
-                            for i, p_item in enumerate(parts):
-                                if "CEP:" in p_item:
-                                    cep_part_index = i
-                                    break
-                            if cep_part_index != -1 and cep_part_index + 1 < len(parts):
-                                potential_city_part = parts[cep_part_index + 1].strip()
-                                cidade_from_cep_part = return_word_founded_in_sentence(potential_city_part, city_names)
-                                if cidade_from_cep_part:
-                                    cidade = cidade_from_cep_part
-                                elif not bairro and bairro_candidate: # If bairro wasn't matched from common list, use the candidate if city found elsewhere
-                                    bairro = bairro_candidate.split('-')[0].strip() # Remove CEP if appended
+            # Attempt to get city from title first, as it's more reliable
+            title_b_tag = p_tag.find('b')
+            if title_b_tag and 'em Leilão em' in title_b_tag.text:
+                try:
+                    cidade = title_b_tag.text.split('em Leilão em')[1].split('/')[0].strip()
+                except IndexError:
+                    pass
 
-                        # Fallback if bairro still not found and we have a bairro_candidate
-                        if not bairro and bairro_candidate and bairro_candidate.upper() not in rua.upper():
-                            bairro = bairro_candidate.split('-')[0].strip() # Clean up if CEP part is there
-                            if bairro.upper() == cidade.upper(): # Avoid bairro being same as city
-                                bairro = ""
+            span_tag = p_tag.find('span')
+            if not span_tag:
+                # If city was found, return that, otherwise Curitiba as default
+                return "", "", cidade if cidade else "Curitiba"
+            
+            full_address_text = ' '.join(span_tag.text.strip().split()) # Normalize spaces
 
-                        # If cidade is still empty, use a default if appropriate (e.g. "Curitiba" if all are from there)
-                        if not cidade:
-                            cidade = "Curitiba" # Default based on URL, can be made more dynamic
+            # The address string is consistently structured with "- CEP:" separating address from location info.
+            if " - CEP:" in full_address_text:
+                address_details, location_details = full_address_text.split(" - CEP:", 1)
+            else:
+                address_details = full_address_text
+                location_details = ""
 
-            return rua.strip(), bairro.strip(), cidade.strip()
-        except (AttributeError, IndexError) as e:
+            # Extract city from the location part if not already found from the title
+            if not cidade and "," in location_details:
+                try:
+                    # e.g. "81580-010, CURITIBA - PARANA" -> "CURITIBA"
+                    cidade = location_details.split(',')[1].split(' - ')[0].strip()
+                except IndexError:
+                    pass
+            
+            # Default city if still not found
+            if not cidade:
+                cidade = "Curitiba"
+
+            # The first part of the address details, before any comma, is the street.
+            rua = address_details.split(',')[0].strip()
+
+            # Use the list of known neighborhoods to find the bairro in the address string.
+            # This is more robust than relying on position alone, which was causing errors.
+            # It correctly handles cases where address complements are mistaken for neighborhoods.
+            bairro = return_word_founded_in_sentence(address_details, neighborhood_names)
+
+            return rua.strip(), bairro.strip() if bairro else "", cidade.strip()
+
+        except Exception as e:
+            logger.error(f"Error parsing leilao_imovel address: {e}", exc_info=True)
             return "", "", ""
 
     @staticmethod
-    def return_leilao_imovel_tamanho(details_page_url: str, size_config, scraper_instance):
+    def return_leilao_imovel_details_page_info(details_page_url: str, details_config: dict, scraper_instance):
+        area_util = None
+        area_terreno = None
+        aceita_financiamento = None
+        aceita_fgts = None
+        n_garagem = None
+        n_quartos = None
+
+        # Extract relevant sub-configs for clarity
+        size_config = details_config.get('size', {})
+        financing_config = details_config.get('financing_fgts_details', {})
+        parking_config = details_config.get('parking_details', {})
+        room_config = details_config.get('room_details', {})
+
         if not details_page_url:
-            return None
+            return {"area_util": area_util, "area_terreno": area_terreno, "aceita_financiamento": aceita_financiamento, "aceita_fgts": aceita_fgts, "n_garagem": n_garagem, "n_quartos": n_quartos}
         try:
-            # Use the provided scraper instance (requests or cloudscraper)
             response = scraper_instance.get(details_page_url)
-            response.raise_for_status() # Check for HTTP errors
+            response.raise_for_status()
             soup = BeautifulSoup(response.content, "html.parser")
 
-            details_container = soup.find(class_=size_config['container_class'])
-            if details_container:
-                # Find the specific div that contains area info
-                detail_divs = details_container.find_all(class_=size_config['detail_div_class'])
+            # Extract Area Util and Area Terreno
+            details_container_size = soup.find(class_=size_config.get('container_class'))
+            if details_container_size:
+                detail_divs = details_container_size.find_all(class_=size_config.get('detail_div_class'))
                 for div in detail_divs:
                     p_tag = div.find('p')
-                    if p_tag and size_config['area_text_identifier'] in p_tag.text:
-                        value_span = div.find(size_config['value_span_selector'])
+                    if p_tag:
+                        area_text_label = p_tag.text.strip()
+                        value_span = div.find(size_config.get('value_span_selector'))
                         if value_span:
                             tamanho_text = value_span.text.strip()
-                            if size_config['split_text'] in tamanho_text:
-                                tamanho_str = tamanho_text.split(size_config['split_text'])[0].strip().replace(',','.')
-                                return float(tamanho_str)
-            return None
+                            if size_config.get('split_text', ' m²') in tamanho_text:
+                                # Clean the string: remove thousand separators (.), then replace decimal comma (,) with dot (.)
+                                tamanho_str = tamanho_text.split(size_config.get('split_text', ' m²'))[0].strip().replace('.', '').replace(',','.')
+                                try:
+                                    parsed_float = float(tamanho_str)
+                                    # Using get with a default for area_text_identifier as it might not always be present
+                                    if size_config.get('area_text_identifier_util', 'Área Útil:') in area_text_label:
+                                        area_util = parsed_float
+                                    elif size_config.get('area_text_identifier_terreno', 'Área Terreno:') in area_text_label:
+                                        area_terreno = parsed_float
+                                
+                                except ValueError:
+                                    print(f"Error parsing float: {tamanho_text}")
+
+            # Extract Financiamento and FGTS info
+            info_divs = soup.find_all('div', class_=financing_config.get('info_div_class'))
+            for info_div in info_divs:
+                p_tag = info_div.find('p')
+                if p_tag:
+                    text_content = p_tag.get_text(strip=True)
+                    if financing_config.get('text_rejects_financing') in text_content:
+                        aceita_financiamento = False
+                    elif financing_config.get('text_accepts_financing') in text_content:
+                        aceita_financiamento = True
+                    
+                    if financing_config.get('text_accepts_fgts') in text_content:
+                        aceita_fgts = True
+                    elif financing_config.get('text_rejects_fgts') in text_content:
+                        aceita_fgts = False
+            
+            # Extract Parking Spaces info
+            icon_divs = soup.find_all('div', class_=parking_config.get('icon_div_class'))
+            for icon_div in icon_divs:
+                img_tag = icon_div.find('img', alt=parking_config.get('img_alt_text'))
+                # Could also check for title or src contains parking_config.get('img_src_contains')
+                if img_tag:
+                    span_tag = icon_div.find('span') # Assuming span is direct child or first span
+                    if span_tag:
+                        try:
+                            n_garagem = int(span_tag.text.strip())
+                            break # Found parking info
+                        except ValueError:
+                            logger.warning(f"Could not parse parking spaces int from '{span_tag.text.strip()}'")
+
+            # Extract Room count info
+            icon_divs_rooms = soup.find_all('div', class_=room_config.get('icon_div_class'))
+            for icon_div_room in icon_divs_rooms:
+                img_tag_room = icon_div_room.find('img', alt=room_config.get('img_alt_text'))
+                if img_tag_room:
+                    span_tag_room = icon_div_room.find('span')
+                    if span_tag_room:
+                        try:
+                            n_quartos = int(span_tag_room.text.strip())
+                            break # Found room info
+                        except ValueError:
+                            logger.warning(f"Could not parse room count int from '{span_tag_room.text.strip()}'")
+            
+            return {"area_util": area_util, "area_terreno": area_terreno, "aceita_financiamento": aceita_financiamento, "aceita_fgts": aceita_fgts, "n_garagem": n_garagem, "n_quartos": n_quartos}
+
         except (requests.exceptions.RequestException, HTTPError, AttributeError, ValueError, IndexError) as e:
-            # Log error: f"Error fetching/parsing size from {details_page_url}: {e}"
-            return None
+            logger.error(f"Error fetching/parsing details from {details_page_url}: {e}")
+            return {"area_util": area_util, "area_terreno": area_terreno, "aceita_financiamento": aceita_financiamento, "aceita_fgts": aceita_fgts, "n_garagem": n_garagem, "n_quartos": n_quartos}

@@ -32,13 +32,18 @@ class LeilaoImovelRegister(Register):
     preco_segunda_praca: Optional[float]
     data_segunda_praca: Optional[datetime]
     preco_atual: float
-    tamanho: float
+    area_util: Optional[float]
+    area_terreno: Optional[float]
     rua: str
     bairro: str
     cidade: str
     latitude: Optional[float]
     longitude: Optional[float]
     link_detalhes: str
+    aceita_financiamento: Optional[bool]
+    aceita_fgts: Optional[bool]
+    n_garagem: Optional[int]
+    n_quartos: Optional[int]
 
 class LeilaoImovelHistory(Register):
     preco_primeira_praca: Optional[float]

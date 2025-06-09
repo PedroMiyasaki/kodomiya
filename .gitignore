@@ -95,7 +95,18 @@ data/raw/
 data/processed/
 data/interim/
 data/external/
+data/model_training/
+data/samples
 models/
 
 # Power BI files
 *.pbix
+
+# Executables
+*.exe
+*.bat
+*.sh
+*.ps1
+*.cmd
+*.psm1
+*.psd1

@@ -123,4 +123,4 @@ This project is for personal use and was created approximately 2 years ago.
 
 ## Author
 
-Pedro Miyasaki 
+Pedro Miyasaki

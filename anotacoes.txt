@@ -1,29 +1,12 @@
 # Leilão: Framework de analise
 
-0.1 Scrappers rodam todos os dias [evento telegram]
-0.2 Script de montagem de base de power bi + clusterizacao (TODO: Pensar na dimensão de clusterizacao) roda todos os dias [evento telegram]
+1. Scrappers rodam todos os dias [evento telegram], tanto de imóveis gerais, quanto de imóveis em leilão
+2. Script de pré-analise roda todos os dias após os scrappers [evento telegram] lista de imóveis pré-analisados é salva em excel
+3. Processo iterativo -> Para cada imovel na lista pré analisada:
+    1. Analisar situação jurídico financeira do imóvel com mais detalhes
+    2. Determinar ROI real
+    3. Aprovar/Reprovar imóvel
 
-
-Para cada imovel em situação de leilão atualmente:
-    1. Algoritmo/Eu analisa imovel de leilao juridicamente e condições
-    2. Se passar: Algoritmo/Eu pega preço do imóvel e compara com:
-        - Imoveis em mesmo bairro (desvios z)
-        - Imoveis em mesmo cluster (desvios z)
-        - Imoveis em mesmo cluster do bairro (desvios z)
-
-    3. Desvio z médio é calculado para esse model
-    4. Se desvio z > threshold [evento telegram]
-    5. Appenda imóvel no excel atual de analise
-
-6. Gera alerta que base atual de analise está pronta imoveis_para_cotar_2025_05_26.xlsx [evento telegram]
-7. Para cada imóvel nessa base:
-    1. Olha as fotos com mais atenção
-    2. Veja preço e dashboard com mais atenção
-    3. Veja situação jurídica com mais atenção
-    4. Se parecer tudo ok: Anota imóvel
-
-8. Escolhe do passo 7. (se tiver mais de um) o melhor para entrar no leilão!
-
-
-# TODO
-1. Arrumar 403 do zap Imoveis
+4.a Nenhum imóvel passou no Framework de análise: Paciência, esperar próxima rodada
+4.b Um imóvel passou: Participar do leilão e só sair se ROI ficar impagável
+4.c Se mais de um imóvel passar: Otimizar portifólio e entrar nos leilões que ficarem no portifólio

@@ -127,11 +127,18 @@ def run_pipeline_module(pipeline_module_name: str, pipeline_display_name: str):
             del sys.modules[module_import_name]
         
         if success:
-            escaped_dlt_info = escape_markdown(dlt_load_info_str)
+            # Filter out the sensitive/verbose path line from DLT info
+            lines = dlt_load_info_str.splitlines()
+            filtered_lines = [line for line in lines if not line.strip().startswith("The duckdb destination used")]
+            filtered_dlt_info = "\n".join(filtered_lines)
+
+            # Construct the success message
+            # pipeline_display_name is used within *...* for bold. Assumed to be safe.
+            # filtered_dlt_info is placed directly in a code block, so no escaping is needed for it.
             success_message = (
                 f"✅ Pipeline *{pipeline_display_name}* finished successfully.\n"
                 f"⏱️ Duration: {duration:.2f} seconds.\n"
-                f"📊 DLT Load Info:\n```{escaped_dlt_info}```"
+                f"📊 DLT Load Info:\n```{filtered_dlt_info}```"
             )
             send_telegram_message(success_message)
         else:

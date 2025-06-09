@@ -380,6 +380,6 @@ try:
 
 except Exception as e:
     logger.error(f"Pipeline execution failed: {str(e)}", exc_info=True)
-    dlt_pipeline_load_info = {"error": str(e), "message": "Pipeline execution failed before completion."}
+    pipeline_result = {"error": str(e), "message": "Pipeline execution failed before completion."}
 
 logger.info("Viva Real pipeline execution finished")
