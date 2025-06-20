@@ -65,12 +65,14 @@ def generate_leilao_imovel_register(
     propertie_html_class: str = LEILAO_CONFIG['property_card']['html_class'],
     propertie_html_element: str = LEILAO_CONFIG['property_card']['html_element'],
     page_number: int = 1,
-    search_lat_long_view_box: list[Point, Point] = [
-        Point(LEILAO_CONFIG['search_lat_long_view_box'][0][0], LEILAO_CONFIG['search_lat_long_view_box'][0][1]),
-        Point(LEILAO_CONFIG['search_lat_long_view_box'][1][0], LEILAO_CONFIG['search_lat_long_view_box'][1][1])
-    ]
+    search_lat_long_view_box: list[Point] | None = None
 ) -> Iterable[dict]:
     """Scrape and generate property registration data."""
+    if search_lat_long_view_box is None:
+        search_lat_long_view_box = [
+            Point(LEILAO_CONFIG['search_lat_long_view_box'][0][0], LEILAO_CONFIG['search_lat_long_view_box'][0][1]),
+            Point(LEILAO_CONFIG['search_lat_long_view_box'][1][0], LEILAO_CONFIG['search_lat_long_view_box'][1][1])
+        ]
     logger.info("Starting Leilão Imóvel property register scraping")
     logger.info(f"Using base URL: {base_url}")
     geolocator = Nominatim(user_agent=GEOCODING_CONFIG['user_agent'])

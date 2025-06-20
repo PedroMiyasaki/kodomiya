@@ -62,12 +62,15 @@ def generate_chaves_na_mao_register(
     propertie_html_class: str = CHAVES_CONFIG['property_card']['html_class'],
     propertie_html_element: str = CHAVES_CONFIG['property_card']['html_element'],
     page_number: int = 1,
-    search_lat_long_view_box: list[Point, Point] = [
-        Point(CHAVES_CONFIG['search_lat_long_view_box'][0][0], CHAVES_CONFIG['search_lat_long_view_box'][0][1]),
-        Point(CHAVES_CONFIG['search_lat_long_view_box'][1][0], CHAVES_CONFIG['search_lat_long_view_box'][1][1])
-    ]
+    search_lat_long_view_box: list[Point] | None = None
 ) -> Iterable[dict]:
     """Generate property registration data by scraping listings."""
+    if search_lat_long_view_box is None:
+        search_lat_long_view_box = [
+            Point(CHAVES_CONFIG['search_lat_long_view_box'][0][0], CHAVES_CONFIG['search_lat_long_view_box'][0][1]),
+            Point(CHAVES_CONFIG['search_lat_long_view_box'][1][0], CHAVES_CONFIG['search_lat_long_view_box'][1][1])
+        ]
+
     logger.info("Starting Chaves na Mão property register scraping")
     logger.info(f"Using base URL: {base_url}")
     

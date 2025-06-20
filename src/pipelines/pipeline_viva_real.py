@@ -66,12 +66,14 @@ def generate_viva_real_register(
     propertie_html_class: str = VIVA_REAL_CONFIG['property_card']['html_class'],
     propertie_html_element: str = VIVA_REAL_CONFIG['property_card']['html_element'],
     page_number: int = 1,
-    search_lat_long_view_box: list[Point, Point] = [
-        Point(VIVA_REAL_CONFIG['search_lat_long_view_box'][0][0], VIVA_REAL_CONFIG['search_lat_long_view_box'][0][1]),
-        Point(VIVA_REAL_CONFIG['search_lat_long_view_box'][1][0], VIVA_REAL_CONFIG['search_lat_long_view_box'][1][1])
-    ]
+    search_lat_long_view_box: list[Point] | None = None
 ) -> Iterable[dict]:
     """Generate property registration data from Viva Real."""
+    if search_lat_long_view_box is None:
+        search_lat_long_view_box = [
+            Point(VIVA_REAL_CONFIG['search_lat_long_view_box'][0][0], VIVA_REAL_CONFIG['search_lat_long_view_box'][0][1]),
+            Point(VIVA_REAL_CONFIG['search_lat_long_view_box'][1][0], VIVA_REAL_CONFIG['search_lat_long_view_box'][1][1])
+        ]
     logger.info("Starting Viva Real property register scraping")
     logger.info(f"Using base URL: {base_url}")
     geolocator = Nominatim(user_agent=GEOCODING_CONFIG['user_agent'])
