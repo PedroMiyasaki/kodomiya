@@ -96,18 +96,21 @@ def run_pipeline_module(pipeline_module_name: str, pipeline_display_name: str):
         sys.modules[module_import_name] = pipeline_module 
         spec.loader.exec_module(pipeline_module)
         
-        load_info = getattr(pipeline_module, "pipeline_result")
-        dlt_load_info_str = str(load_info)
+        load_info = None
+        if hasattr(pipeline_module, "pipeline_result"):
+            load_info = getattr(pipeline_module, "pipeline_result")
+            dlt_load_info_str = str(load_info)
 
         if load_info:
             if load_info.has_failed_jobs:
                 logger.error(f"Pipeline {pipeline_display_name} reported failed DLT jobs. LoadInfo: {dlt_load_info_str}")
                 success = False
+            
             else:
                 logger.info(f"Pipeline {pipeline_display_name} (Module: {pipeline_module_name}) completed DLT execution.")
                 success = True
+        
         else:
-            logger.warning(f"`pipeline_result` not found in module {pipeline_module_name}. DLT stats will be unavailable.")
             success = True
 
         if success:
@@ -153,8 +156,11 @@ if __name__ == "__main__":
     logger.info(f"Looking for pipelines in: {pipelines_dir}")
 
     pipeline_files = [
-        f for f in os.listdir(pipelines_dir) 
-        if f.startswith("pipeline_") and f.endswith(".py") and f != "__init__.py"
+        "pipeline_chaves_na_mao.py",
+        "pipeline_viva_real.py",
+        "pipeline_zap_imoveis.py",
+        "pipeline_leilao_imovel.py",
+        "pipeline_deduplication.py",
     ]
 
     logger.info(f"Found pipeline files: {pipeline_files}")
@@ -162,6 +168,7 @@ if __name__ == "__main__":
     if not pipeline_files:
         logger.warning("No pipeline files found in src/pipelines starting with 'pipeline_'.")
         send_telegram_message("⚠️ No scraping pipelines found to run.")
+    
     else:
         total_pipelines = len(pipeline_files)
         

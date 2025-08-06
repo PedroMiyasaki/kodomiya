@@ -337,8 +337,12 @@ def leilao_data_cleaning(df):
     Clean and preprocess the auction dataframe based on the new schema.
     """
     df_leilao = df.copy()
-    df_leilao = df_leilao.applymap(lambda x: None if x == "<NA>" else x)
+    df_leilao = df_leilao.applymap(lambda x: None if str(x) == "<NA>" else x)
     df_leilao = df_leilao.drop_duplicates(subset=["id"])
+
+    # Just maintain properties that acept financing (or are not available)
+    df_leilao["aceita_financiamento"] = df_leilao["aceita_financiamento"].apply(str).fillna("N/A")
+    df_leilao = df_leilao.loc[(df_leilao["aceita_financiamento"] == "True") | (df_leilao["aceita_financiamento"] == "N/A")]
 
     # Rename columns to match the historical schema used across the script
     df_leilao = df_leilao.rename(columns={
@@ -385,7 +389,7 @@ def main() -> None:
         
         # Fetch leilao data
         today = datetime.now().strftime("%Y-%m-%d")
-        df_leilao = con.execute(f"SELECT * FROM kodomiya_leilao_imovel.leilao_imovel_register WHERE data_primeira_praca	< '{today}' OR data_segunda_praca < '{today}'").fetchdf()
+        df_leilao = con.execute(f"SELECT * FROM kodomiya_leilao_imovel.leilao_imovel_register WHERE data_primeira_praca	> '{today}' OR data_segunda_praca > '{today}'").fetchdf()
         
         logger.info(f"Loaded {len(df_kb)} properties from knowledge base and {len(df_leilao)} open auctions.")
 
@@ -517,6 +521,7 @@ def main() -> None:
 
             knn_results = df_leilao_knn_imputed[['id', 'knn_roi', 'knn_rank']].copy()
             all_opportunities = all_opportunities.merge(knn_results, on='id', how='outer')
+        
         else:
             logger.warning("Skipping KNN 'comps' analysis as model is not built.")
             
@@ -556,18 +561,18 @@ def main() -> None:
         if final_opportunities.empty:
             logger.info("No promising opportunities found after final analysis. Exiting.")
             return
-    	
-        # Filter step (Only maintain properties on wich at least one of the methods ROI's are > SELIC_RATE_ANNUAL * 1.5)
+
+        # Filter step (Only maintain properties on wich at least one of the methods ROI's are > SELIC_RATE_ANNUAL + 5%)
         final_opportunities = final_opportunities.loc[
-            (final_opportunities['z_score_roi'] > (SELIC_RATE_ANNUAL * 100) * 1.5) |
-            (final_opportunities['model_roi'] > (SELIC_RATE_ANNUAL * 100) * 1.5) |
-            (final_opportunities['knn_roi'] > (SELIC_RATE_ANNUAL * 100) * 1.5)
+            (final_opportunities['z_score_roi'] > (SELIC_RATE_ANNUAL * 100) + 5) |
+            (final_opportunities['model_roi'] > (SELIC_RATE_ANNUAL * 100) + 5) |
+            (final_opportunities['knn_roi'] > (SELIC_RATE_ANNUAL * 100) + 5)
         ]
         
         # E. Send Telegram Notifications
         # ----------------------------------------------------------------
         logger.info("Sending Telegram notifications for top properties...")
-        for _, row in final_opportunities.head(10).iterrows():
+        for _, row in final_opportunities.iterrows():
             try:
                 z_score_rank_text = str(int(row['z_score_rank'])) if row['z_score_rank'] != 999 else "N/A"
                 if row.get('z_score_fallback') and z_score_rank_text != "N/A":
